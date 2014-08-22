@@ -6,3 +6,9 @@
 
 # R data files from past sessions
 .Rdata
+
+stormDataAnalysis_cache/*
+*.csv
+*.bz2
+StormData.csv.bz2
+*~

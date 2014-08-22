@@ -1,0 +1,239 @@
+---
+title: "Summary of Severe Weather Events on Population Health and Economy in the U.S."
+author: "qingcheng"
+date: "Thursday, August 21, 2014"
+output:
+  html_document:
+    keep_md: yes
+    self_contained: yes
+  pdf_document: default
+---
+
+### Couresra-[Reproducible Research][repdata-005][Peer Assessment 2]
+
+# A. Synopsis
+In this data analysis document, we will consider two questions. 
+
+> * Which types of severe weather events are most harmful with respect to **population health** across the United States? 
+> * Which types of events have the greatest **economic consequences**?
+
+The data we used come from the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+The data come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. The data can be downloaded from the course web site:
+
+> * [Storm Data][1]
+
+There is also two documentation of the database available:
+
+> * [National Weather Service Storm Data Documentation][2]
+> * [National Climatic Data Center Storm Events FAQ][3]
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+From the analysis results, we can see that **tornado** is the most harmful with respect to **population health**, and **flood** and **drought** have the greatest economic consequences.
+
+
+# B. Data Processing
+
+### B.1. Locale and environment
+
+```{r}
+Sys.setlocale('LC_ALL', 'English')
+sessionInfo()
+```
+
+### B.2. Download and read the dataset
+```{r cache=TRUE}
+DataUrl<-"http://d396qusza40orc.cloudfront.net/repdata/data/StormData.csv.bz2"
+filename = "StormData.csv.bz2"
+
+download.file(DataUrl, destfile=filename)
+dateDownloaded <- date()
+dateDownloaded
+
+stormData <- read.csv(bzfile(filename))
+```
+
+### B.3. Cleaning the dataset
+The size of the raw data loaded is quite big:
+```{r}
+print(object.size(stormData), units = "MB")
+```
+
+So we need to subset the data selecting only columns relevant to the analysis. First to see the summary of the raw data:
+```{r}
+str(stormData)
+```
+We can see that there are **`r nrow(stormData)`** obsevations of **`r ncol(stormData)`** variables in the raw data. Only 8 variables relevant to this analysis, so we subset these variables in new data frame *data*:
+```{r cache=TRUE}
+data <- stormData[, c("BGN_DATE", "EVTYPE", "FATALITIES", "INJURIES",
+                      "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+colnames(data) <- tolower(colnames(data))  #column names to lower case
+rm(stormData)
+```
+
+We begin by creating a new variable *date* in the *data* by coercing the "BGN_DATE" variable into a Date format variable.
+```{r}
+data$date <- as.Date(data$bgn_date, format = "%m/%d/%Y")
+mindate <- min(data$date)
+maxdate <- max(data$date)
+```
+Therefore, the data was collected from **`r mindate`** to **`r maxdate`**.
+
+To study which type of weather events are most harmful with respect to **population health**, we can take a look at the number of **fatalities** and **injuries** caused by different types of weather events.
+
+For question which type of weather events have the greatest **economic consequences**, we will compare the **property damage** and **crop damage** caused by different types of weather events. As mentioned in section 2.7 of [National Weather Service Storm Data Documentation][2], we need to convert the values of the columns `PROPDMG` and `CROPDMG` to unified number in dollars units, with the information in:
+
+> * `PROPDMGEXP`: magnitude of the number value of property damage.
+> * `PROPDMGEXP`: magnitude of the number value of crop damage.
+
+Take a look at the `PROPDMGEXP` and `PROPDMGEXP`:
+```{r}
+#all event types to upper case and refactored
+data$evtype <- factor(toupper(data$evtype))  
+# all exponents defining unit of measurement of costs to upper case and refactored
+data$propdmgexp <- factor(toupper(data$propdmgexp))
+data$cropdmgexp <- factor(toupper(data$cropdmgexp))
+levels(data$cropdmgexp)
+levels(data$propdmgexp)
+```
+We just keep those records which have one of these values in these fields:
+
+> * "" and "0": for one
+> * "H": for hundreds
+> * "K": for thousands
+> * "M": for millions
+> * "B": for billions
+
+```{r cache = TRUE}
+# define multipliers for valid exponents
+validExpo <- data.frame(c("", "0", "H", "K", "M", "B"), 
+                             c(1, 1, 10^2, 10^3, 10^6, 10^9))
+colnames(validExpo) <- c("validexp", "multiplier")
+
+# subset data retaining only records with valid exponent
+data <- subset(data, (cropdmgexp %in% validExpo$validexp) & (propdmgexp %in% 
+    validExpo$validexp))
+nrow(data) 
+```
+
+Compare with the origin number of obsevations **902297**, we know that the vast majority of records (**`r nrow(data)`**) have a meaningful exponent. Then we convert the damage values to number in dollars units.
+```{r}
+colnames(validExpo) <- c("validexp", "propdmgmultiplier")
+data <- merge(data, validExpo, by.x = "propdmgexp", by.y = "validexp")
+data$propdmg <- (data$propdmg * data$propdmgmultiplier)
+
+colnames(validExpo) <- c("validexp", "cropdmgmultiplier")
+data <- merge(data, validExpo, by.x = "cropdmgexp", by.y = "validexp")
+data$cropdmg <- (data$cropdmg * data$cropdmgmultiplier)
+```
+
+
+### B.4. The top 10 serious types of events on Population Health
+
+After above data cleaning work, we will sort the data first then only take the 10 first most serious types of weather events to visualize and analyze. 
+```{r}
+library(plyr)
+Fatalities <- aggregate(x = data$fatalities, by = list(data$evtype), FUN = sum)
+names(Fatalities) <- c("evtype", "fatalities")
+Fatalities <- arrange(Fatalities, fatalities, decreasing = TRUE)
+Top10Fatalities <- head(Fatalities, n = 10)
+Top10Fatalities <- within(Top10Fatalities, 
+                          evtype <- factor(x = evtype, levels = Fatalities$evtype))
+
+Injuries <- aggregate(x = data$injuries, by = list(data$evtype), FUN = sum)
+names(Injuries) <- c("evtype", "injuries")
+Injuries <- arrange(Injuries, injuries, decreasing = TRUE)
+Top10Injuries <- head(Injuries, n = 10)
+Top10Injuries <- within(Top10Injuries, 
+                        evtype <- factor(x = evtype, levels = Top10Injuries$evtype))
+```
+
+
+### B.5. The top 10 serious types of events on Economic Consequences
+Like the previous section, we only select top 10 serious types of events to visualize and analyze. 
+```{r}
+PropertyDmg <- aggregate(x = data$propdmg, by = list(data$evtype), FUN = sum)
+names(PropertyDmg) <- c("evtype", "propdmg")
+PropertyDmg <- arrange(PropertyDmg, propdmg, decreasing = TRUE)
+Top10PropertyDmg <- head(PropertyDmg, n = 10)
+Top10PropertyDmg <- within(Top10PropertyDmg, evtype <- 
+                               factor(x = evtype, levels = Top10PropertyDmg$evtype))
+
+CropDmg <- aggregate(x = data$cropdmg, by = list(data$evtype), FUN = sum)
+names(CropDmg) <- c("evtype", "cropdmg")
+CropDmg <- arrange(CropDmg, cropdmg, decreasing = TRUE)
+Top10CropDmg <- head(CropDmg, n = 10)
+Top10CropDmg <- within(Top10CropDmg, 
+                       evtype <- factor(x = evtype, levels = Top10CropDmg$evtype))
+```
+
+
+# C. Results
+After data processing we can plot and visualize our results.
+
+### C.1. Population Health
+
+Total **fatalities** of top 10 events
+```{r}
+Top10Fatalities
+
+```
+
+Total **injuries** of top 10 events
+```{r}
+Top10Injuries
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+plot1 <- qplot(evtype, data = Top10Fatalities, weight = fatalities, geom = "bar", 
+               binwidth = 1) + scale_y_continuous("Number of Fatalities") +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+    xlab("Event Type") + ggtitle("Total Fatalities by Event Type")
+
+plot2 <- qplot(evtype, data = Top10Injuries, weight = injuries, geom = "bar", 
+               binwidth = 1) + scale_y_continuous("Number of Injuries") + 
+    theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+    xlab("Event Type") + ggtitle("Total Injuries by Event Type")
+grid.arrange(plot1, plot2, ncol = 2)
+```
+
+From the table and histograms above, we can see that the **tornado** is the most harmful with respect to **population health** across the United States.
+
+### C.2. Economic Consequences
+
+Total **Property Damage** of top 10 events
+```{r}
+Top10PropertyDmg
+
+```
+
+Total **Crop Damage** of top 10 events
+```{r}
+Top10CropDmg
+```
+
+```{r}
+plot3 <- qplot(evtype, data = Top10PropertyDmg, weight = propdmg, geom = "bar", 
+               binwidth = 1) + 
+    theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+    ylab("Property Damage in US dollars") + 
+    xlab("Event Type") + ggtitle("Total Property Damage")
+
+plot4 <- qplot(evtype, data = Top10CropDmg, weight = cropdmg, geom = "bar", 
+               binwidth = 1) + 
+    theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+    ylab("Crop Damage in US dollars") + 
+    xlab("Event Type") + ggtitle("Total Crop Damage")
+grid.arrange(plot3, plot4, ncol = 2)
+```
+As shown in the table and figure above, **flood** has the greatest property damage, and **drought** has the most serious impact on crop damage. 
+
+
+[1]:https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2
+[2]:https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf
+[3]:https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf
+
