@@ -267,7 +267,7 @@ Top10CropDmg <- within(Top10CropDmg,
 
 
 # C. Results
-After data processing we can plot and visualize our results.
+After data processing above we can visualize our results.
 
 ### C.1. Population Health
 
@@ -397,6 +397,7 @@ grid.arrange(plot3, plot4, ncol = 2)
 ```
 
 ![plot of chunk unnamed-chunk-17](./stormDataAnalysis_files/figure-html/unnamed-chunk-17.png) 
+
 As shown in the table and figure above, **flood** has the greatest property damage, and **drought** has the most serious impact on crop damage. 
 
 

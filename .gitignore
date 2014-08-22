@@ -11,4 +11,6 @@ stormDataAnalysis_cache/*
 *.csv
 *.bz2
 StormData.csv.bz2
+*Page.pdf
+*curr.pdf
 *~

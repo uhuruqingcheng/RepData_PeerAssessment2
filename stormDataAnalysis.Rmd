@@ -3,10 +3,10 @@ title: "Summary of Severe Weather Events on Population Health and Economy in the
 author: "qingcheng"
 date: "Thursday, August 21, 2014"
 output:
+  pdf_document: default
   html_document:
     keep_md: yes
     self_contained: yes
-  pdf_document: default
 ---
 
 ### Couresra-[Reproducible Research][repdata-005][Peer Assessment 2]
@@ -170,7 +170,7 @@ Top10CropDmg <- within(Top10CropDmg,
 
 
 # C. Results
-After data processing we can plot and visualize our results.
+After data processing above we can visualize our results.
 
 ### C.1. Population Health
 
@@ -230,6 +230,7 @@ plot4 <- qplot(evtype, data = Top10CropDmg, weight = cropdmg, geom = "bar",
     xlab("Event Type") + ggtitle("Total Crop Damage")
 grid.arrange(plot3, plot4, ncol = 2)
 ```
+
 As shown in the table and figure above, **flood** has the greatest property damage, and **drought** has the most serious impact on crop damage. 
 
 
